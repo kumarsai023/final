@@ -8,8 +8,8 @@ import time
 
 class FaceDataCollector:
     def __init__(self, 
-                 student_number: str,  # Added student number
-                 save_dir: str = "data",
+                 student_number: str,
+                 save_dir: str = None,  # Changed to None for default path
                  required_samples: int = 100,
                  face_size: Tuple[int, int] = (224, 224),
                  capture_delay: float = 0.8):
@@ -17,7 +17,15 @@ class FaceDataCollector:
         Initialize the face data collector for a single student
         """
         self.student_number = student_number
-        self.save_dir = save_dir
+        
+        # Set default save directory to project root/data
+        if save_dir is None:
+            # Get the project root directory (two levels up from this file)
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            self.save_dir = os.path.join(project_root, "data", "student_data")
+        else:
+            self.save_dir = save_dir
+            
         self.required_samples = required_samples
         self.face_size = face_size
         self.capture_delay = capture_delay
@@ -28,7 +36,7 @@ class FaceDataCollector:
         )
         
         # Create unique directory for each student
-        self.student_dir = os.path.join(save_dir, f"student_{student_number}")
+        self.student_dir = os.path.join(self.save_dir, f"student_{student_number}")
         os.makedirs(self.student_dir, exist_ok=True)
         
         # Setup logging
@@ -144,7 +152,6 @@ def main():
     # Get student number
     while True:
         student_number = input("\nEnter student number (e.g., 01, 02, etc.): ").strip()
-        # Convert single digit to two digits
         if student_number.isdigit():
             if len(student_number) == 1:
                 student_number = f"0{student_number}"
@@ -152,9 +159,9 @@ def main():
                 break
         print("Please enter a valid student number (1-99)!")
     
+    # Create collector with correct path
     collector = FaceDataCollector(
         student_number=student_number,
-        save_dir="data/student_data",
         required_samples=100,
         face_size=(224, 224),
         capture_delay=0.8
@@ -165,7 +172,7 @@ def main():
     if len(face_data) >= collector.required_samples:
         print(f"\nCollection completed for Student {student_number}!")
         print(f"Total images: {len(face_data)}")
-        print(f"Images saved in: data/student_data/student_{student_number}/")
+        print(f"Images saved in: {collector.student_dir}")
     else:
         print("\nCollection incomplete")
         print(f"Collected: {len(face_data)}/{collector.required_samples}")

@@ -10,9 +10,12 @@ from datetime import datetime
 class FaceProcessor:
     def __init__(self):
         """Initialize Face Processor with InsightFace"""
+        # Get project root directory
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        
         self.app = FaceAnalysis(
             name="buffalo_l",
-            root="models",
+            root=os.path.join(project_root, "models"),  # Updated path
             providers=['CPUExecutionProvider']
         )
         # Adjust detection size and parameters
@@ -20,8 +23,11 @@ class FaceProcessor:
         
     def process_student_images(self, student_number: str) -> Optional[np.ndarray]:
         """Process student images and generate embedding"""
-        # Define student-specific directory
-        image_dir = os.path.join("data", "student_data", f"student_{student_number}")
+        # Get project root directory
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        
+        # Define student-specific directory using project root
+        image_dir = os.path.join(project_root, "data", "student_data", f"student_{student_number}")
         embeddings = []
         
         # Get all images
@@ -84,8 +90,8 @@ class FaceProcessor:
         # Normalize embedding
         average_embedding = average_embedding / np.linalg.norm(average_embedding)
         
-        # Save embedding with student number
-        embedding_dir = os.path.join("data", "embeddings")
+        # Save embedding in project root's data/embeddings folder
+        embedding_dir = os.path.join(project_root, "data", "embeddings")
         os.makedirs(embedding_dir, exist_ok=True)
         embedding_path = os.path.join(embedding_dir, f"student_{student_number}_embedding.npy")
         np.save(embedding_path, average_embedding)
@@ -148,18 +154,24 @@ def main():
                 break
         print("Please enter a valid student number (1-99)!")
     
-    processor = FaceProcessor()
+    # Get project root directory
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     
-    # Process images for specific student
-    student_dir = os.path.join("data", "student_data", f"student_{student_number}")
-    
-    # Debug: Check if directory exists
-    if not os.path.exists(student_dir):
-        print(f"Error: Directory not found: {student_dir}")
+    # Create necessary directories using project root
+    student_data_dir = os.path.join(project_root, "data", "student_data", f"student_{student_number}")
+    if not os.path.exists(student_data_dir):
+        print(f"\nError: No data found for student {student_number}")
+        print(f"Please ensure images are collected in: {student_data_dir}")
+        print("\nFollow these steps:")
+        print("1. First collect face data using:")
+        print("   python src/data_collection/face_collector.py")
+        print("2. Then run feature extraction")
         return
     
+    processor = FaceProcessor()
+    
     print(f"\nProcessing images for Student {student_number}")
-    print(f"Using directory: {student_dir}")
+    print(f"Using directory: {student_data_dir}")
     
     embedding = processor.process_student_images(student_number)
     

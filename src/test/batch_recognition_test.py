@@ -7,10 +7,6 @@ from insightface.app import FaceAnalysis
 from datetime import datetime
 from typing import Tuple, List, Dict
 
-# Add parent directory to path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from attendance.attendance_checker import AttendanceChecker
-
 class BatchFaceRecognitionTester:
     def __init__(self):
         """Initialize batch face recognition tester"""
@@ -39,7 +35,10 @@ class BatchFaceRecognitionTester:
     
     def load_latest_global_model(self):
         """Load the latest global model"""
-        global_model_dir = "data/global_model"
+        # Get project root directory
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        global_model_dir = os.path.join(project_root, "data", "global_model")
+        
         model_files = [f for f in os.listdir(global_model_dir) 
                       if f.startswith('global_model_')]
         
@@ -48,7 +47,35 @@ class BatchFaceRecognitionTester:
         
         latest_model = os.path.join(global_model_dir, sorted(model_files)[-1])
         print(f"\nLoading global model: {latest_model}")
-        self.attendance_checker = AttendanceChecker(latest_model)
+        
+        # Load the model data
+        self.model_data = np.load(latest_model, allow_pickle=True)
+        self.student_embeddings = {}
+        
+        # Load student embeddings
+        student_ids = self.model_data['student_ids']
+        for student_id in student_ids:
+            self.student_embeddings[str(student_id)] = self.model_data[str(student_id)]
+        
+        print(f"Loaded embeddings for {len(self.student_embeddings)} students")
+    
+    def check_face(self, face_embedding: np.ndarray, threshold: float = 0.7) -> Tuple[bool, str, float]:
+        """Check a face against stored embeddings"""
+        best_match = {'student_id': None, 'similarity': 0.0}
+        
+        for student_id, stored_embedding in self.student_embeddings.items():
+            # Calculate cosine similarity
+            similarity = np.dot(face_embedding, stored_embedding) / \
+                        (np.linalg.norm(face_embedding) * np.linalg.norm(stored_embedding))
+            
+            if similarity > best_match['similarity']:
+                best_match = {
+                    'student_id': student_id,
+                    'similarity': similarity
+                }
+        
+        is_match = best_match['similarity'] >= threshold
+        return is_match, best_match['student_id'], best_match['similarity']
     
     def process_image(self, image: np.ndarray) -> Tuple[np.ndarray, List[Dict]]:
         """Process a single image and return results"""
@@ -62,21 +89,15 @@ class BatchFaceRecognitionTester:
             embedding = face.embedding
             
             # Check against global model
-            match_result = self.attendance_checker.mark_attendance(
-                embedding,
-                threshold=0.7
-            )
+            is_match, student_id, confidence = self.check_face(embedding)
             
             # Determine color and text based on match
-            if "Present: Student" in match_result:
+            if is_match:
                 color = self.GREEN
-                student_id = match_result.split("Student ")[1].split(" ")[0]
                 text = f"Student {student_id}"
-                confidence = float(match_result.split("Confidence: ")[1].strip(")"))
             else:
                 color = self.RED
                 text = "Unknown"
-                confidence = 0.0
             
             # Draw rectangle
             cv2.rectangle(
@@ -101,9 +122,9 @@ class BatchFaceRecognitionTester:
             # Store result
             results.append({
                 'bbox': bbox.tolist(),
-                'match_result': match_result,
+                'student_id': student_id if is_match else None,
                 'confidence': confidence,
-                'recognized': color == self.GREEN
+                'recognized': is_match
             })
         
         return image, results
@@ -144,7 +165,10 @@ class BatchFaceRecognitionTester:
                 
                 print(f"Results saved: processed_{filename}")
                 for result in results:
-                    print(f"- {result['match_result']}")
+                    if result['recognized']:
+                        print(f"- Student {result['student_id']} (Confidence: {result['confidence']:.2f})")
+                    else:
+                        print("- Unknown person")
         
         # Save summary
         self.save_summary(summary)
@@ -162,9 +186,12 @@ class BatchFaceRecognitionTester:
             for entry in summary:
                 f.write(f"Image: {entry['filename']}\n")
                 for result in entry['results']:
-                    f.write(f"- {result['match_result']}\n")
-                    f.write(f"  Confidence: {result['confidence']:.2f}\n")
-                    f.write(f"  Recognized: {result['recognized']}\n")
+                    if result['recognized']:
+                        f.write(f"- Student {result['student_id']}\n")
+                        f.write(f"  Confidence: {result['confidence']:.2f}\n")
+                    else:
+                        f.write("- Unknown person\n")
+                        f.write(f"  Confidence: {result['confidence']:.2f}\n")
                 f.write("\n")
 
 def main():

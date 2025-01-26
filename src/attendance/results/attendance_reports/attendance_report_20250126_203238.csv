@@ -1,0 +1,12 @@
+Attendance Report,20250126_203238
+
+Present Students
+Student student_01
+
+Detailed Results by Photo
+"
+Photo: IMG-20250126-WA0015.jpg"
+Face,Status,Student ID,Confidence
+Face 1,Unknown,N/A,0.00
+Face 2,Unknown,N/A,0.30
+Face 3,Present,student_01,0.77
