@@ -18,13 +18,15 @@ class FaceProcessor:
         # Adjust detection size and parameters
         self.app.prepare(ctx_id=0, det_size=(320, 320))  # Reduced size
         
-    def process_student_images(self, image_dir: str) -> Optional[np.ndarray]:
+    def process_student_images(self, student_number: str) -> Optional[np.ndarray]:
         """Process student images and generate embedding"""
+        # Define student-specific directory
+        image_dir = os.path.join("data", "student_data", f"student_{student_number}")
         embeddings = []
         
         # Get all images
         image_files = [f for f in os.listdir(image_dir) if f.endswith('.jpg')]
-        print(f"\nProcessing {len(image_files)} images...")
+        print(f"\nProcessing {len(image_files)} images for Student {student_number}...")
         
         # Debug: Print full path
         print(f"Image directory: {os.path.abspath(image_dir)}")
@@ -49,7 +51,7 @@ class FaceProcessor:
                     img = cv2.resize(img, None, fx=scale, fy=scale)
                 
                 # Get face embedding
-                faces = self.app.get(img)  # Simplified call without extra parameters
+                faces = self.app.get(img)
                 
                 if not faces:
                     # Try with resized image
@@ -81,6 +83,13 @@ class FaceProcessor:
         average_embedding = np.mean(embeddings, axis=0)
         # Normalize embedding
         average_embedding = average_embedding / np.linalg.norm(average_embedding)
+        
+        # Save embedding with student number
+        embedding_dir = os.path.join("data", "embeddings")
+        os.makedirs(embedding_dir, exist_ok=True)
+        embedding_path = os.path.join(embedding_dir, f"student_{student_number}_embedding.npy")
+        np.save(embedding_path, average_embedding)
+        print(f"\nEmbedding saved as: {embedding_path}")
         
         return average_embedding
     
@@ -126,33 +135,40 @@ class FaceProcessor:
 
 def main():
     """Test the face processor"""
+    print("\nFace Feature Extraction")
+    print("=====================")
+    
+    # Get student number
+    while True:
+        student_number = input("\nEnter student number (e.g., 01, 02, etc.): ").strip()
+        if student_number.isdigit():
+            if len(student_number) == 1:
+                student_number = f"0{student_number}"
+            if len(student_number) == 2:
+                break
+        print("Please enter a valid student number (1-99)!")
+    
     processor = FaceProcessor()
     
-    # Use absolute path
-    student_dir = os.path.abspath("data/student_data")  # Directory with your 100 images
+    # Process images for specific student
+    student_dir = os.path.join("data", "student_data", f"student_{student_number}")
     
     # Debug: Check if directory exists
     if not os.path.exists(student_dir):
         print(f"Error: Directory not found: {student_dir}")
-        # Try alternative path
-        student_dir = os.path.abspath("F:/fl/data/student_data")
-        if not os.path.exists(student_dir):
-            print(f"Error: Alternative path not found: {student_dir}")
-            return
+        return
     
-    print(f"\nUsing directory: {student_dir}")
-    print("Starting feature extraction...")
+    print(f"\nProcessing images for Student {student_number}")
+    print(f"Using directory: {student_dir}")
     
-    embedding = processor.process_student_images(student_dir)
+    embedding = processor.process_student_images(student_number)
     
     if embedding is not None:
         print("\nFeature extraction successful!")
         print(f"Embedding shape: {embedding.shape}")
-        
-        # Save embedding
-        os.makedirs("data/embeddings", exist_ok=True)
-        np.save("data/embeddings/student_embedding.npy", embedding)
-        print("\nEmbedding saved successfully!")
+        print(f"Saved as: student_{student_number}_embedding.npy")
+    else:
+        print("\nFeature extraction failed!")
 
 if __name__ == "__main__":
     main() 

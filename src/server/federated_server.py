@@ -24,10 +24,10 @@ class FederatedServer:
         )
         self.logger = logging.getLogger(__name__)
         
-        # Store student embeddings
+        # Store student embeddings as dictionary with student IDs as keys
         self.global_model_dir = "data/global_model"
         os.makedirs(self.global_model_dir, exist_ok=True)
-        self.student_embeddings = {}
+        self.student_embeddings = {}  # Format: {'student_01': embedding1, 'student_02': embedding2, ...}
     
     def send_message(self, client_socket: socket.socket, message: Message):
         """Send message with length prefix"""
@@ -114,21 +114,52 @@ class FederatedServer:
             client_socket.close()
     
     def save_global_model(self):
-        """Save current global model"""
+        """Save current global model with student IDs"""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         save_path = os.path.join(
             self.global_model_dir,
             f"global_model_{timestamp}.npz"
         )
         
+        # Save as a dictionary with student IDs
         np.savez(
             save_path,
-            student_embeddings=self.student_embeddings,
-            num_students=len(self.student_embeddings),
+            **self.student_embeddings,  # Save each student's embedding with their ID
+            student_ids=list(self.student_embeddings.keys()),  # Save list of student IDs
             timestamp=timestamp
         )
         
         self.logger.info(f"Global model saved with {len(self.student_embeddings)} students")
+        self.logger.info(f"Student IDs in model: {list(self.student_embeddings.keys())}")
+
+    def load_global_model(self, model_path: str = None):
+        """Load the latest global model"""
+        if model_path is None:
+            # Get the latest model file
+            model_files = [f for f in os.listdir(self.global_model_dir) if f.startswith('global_model_')]
+            if not model_files:
+                return
+            model_path = os.path.join(self.global_model_dir, sorted(model_files)[-1])
+        
+        # Load the model
+        data = np.load(model_path, allow_pickle=True)
+        
+        # Load student IDs and their embeddings
+        student_ids = data['student_ids']
+        self.student_embeddings = {}
+        for student_id in student_ids:
+            self.student_embeddings[str(student_id)] = data[str(student_id)]
+        
+        self.logger.info(f"Loaded global model with {len(self.student_embeddings)} students")
+        self.logger.info(f"Student IDs: {list(self.student_embeddings.keys())}")
+
+    def get_student_embedding(self, student_id: str) -> np.ndarray:
+        """Get embedding for a specific student"""
+        return self.student_embeddings.get(student_id)
+
+    def list_registered_students(self):
+        """List all registered students"""
+        return list(self.student_embeddings.keys())
 
 def main():
     """Run the server"""

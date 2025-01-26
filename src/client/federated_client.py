@@ -94,17 +94,29 @@ def main():
     print("\nFederated Client")
     print("===============")
     
-    # Load student embedding
-    embedding_path = os.path.join("data", "embeddings", "student_embedding.npy")
+    # Get student number
+    while True:
+        student_number = input("\nEnter student number (e.g., 01, 02, etc.): ").strip()
+        if student_number.isdigit():
+            if len(student_number) == 1:
+                student_number = f"0{student_number}"
+            if len(student_number) == 2:
+                break
+        print("Please enter a valid student number (1-99)!")
+    
+    # Load student embedding with correct path
+    embedding_path = os.path.join("data", "embeddings", f"student_{student_number}_embedding.npy")
+    
     if not os.path.exists(embedding_path):
-        print("Error: No student embedding found!")
+        print(f"Error: No embedding found at {embedding_path}")
+        print("Please make sure you have generated the embedding first.")
         return
     
     features = np.load(embedding_path)
-    print(f"Loaded features shape: {features.shape}")
+    print(f"\nLoaded features shape: {features.shape}")
     
     # Send features
-    client = FederatedClient("student_01")
+    client = FederatedClient(f"student_{student_number}")
     client.send_features(features)
 
 if __name__ == "__main__":
